@@ -1,9 +1,8 @@
----
-
 # 🚤 Eco Bilge: AI Research Pipeline
-### *Programmatic PRISMA 2020 Implementation for Global Marine Pollution Analysis*
 
-**Eco Bilge** is a specialized "Research Operating System" developed to quantify and validate global oil and detergent pollution estimates from vessels under 400 Gross Tonnage (GT). 
+### _Programmatic PRISMA 2020 Implementation for Global Marine Pollution Analysis_
+
+**Eco Bilge** is a specialized "Research Operating System" developed to quantify and validate global oil and detergent pollution estimates from vessels under 400 Gross Tonnage (GT).
 
 By replacing manual bibliometrics with a programmatic pipeline, this project bypasses the "ocean of noise" found in traditional academic databases, identifying high-value data points for statistical meta-analysis in record time.
 
