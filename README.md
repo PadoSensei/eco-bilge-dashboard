@@ -15,6 +15,12 @@ By replacing manual bibliometrics with a programmatic pipeline, this project byp
 - **Scientific Rigor:** Maintain a transparent, unbiased audit trail compliant with the **PRISMA 2020** protocol for high-impact journal publication.
 - **Scalability:** Build a modular system that can ingest data from **OpenAlex**, **Scopus**, and **Web of Science**.
 
+## 📁 Project Data
+
+You can find the latest screening results in the `/data` folder:
+
+- [Phase 1 Screening Snapshot (March 03, 2026)](./data/eco_bilge_screening_snapshot_2026_03_03.csv)
+
 ---
 
 ## 🧠 The Methodology
