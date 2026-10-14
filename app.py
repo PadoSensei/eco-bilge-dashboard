@@ -12,13 +12,28 @@ st.set_page_config(page_title="Eco Bilge Research OS", layout="wide")
 # Connect to Neon
 @st.cache_resource
 def get_neon_connection():
+    # Return the connection object
     return psycopg2.connect(os.getenv("NEON_CONNECTION_STRING"))
 
 def fetch_data():
     conn = get_neon_connection()
-    # Query all data from the migrated table
-    query = "SELECT * FROM public.screening_phase_1 ORDER BY created_at DESC"
-    return pd.read_sql_query(query, conn)
+    
+    # 1. Check if connection is closed
+    if conn.closed != 0:
+        st.cache_resource.clear()  # Clear the bad connection
+        conn = get_neon_connection() # Reconnect
+        
+    # 2. Check if the transaction is aborted (e.g. after a bad query)
+    try:
+        query = "SELECT * FROM public.screening_phase_1 ORDER BY created_at DESC"
+        return pd.read_sql_query(query, conn)
+    except psycopg2.InterfaceError:
+        # If it failed, clear cache and try one more time
+        st.cache_resource.clear()
+        conn = get_neon_connection()
+        return pd.read_sql_query(query, conn)
+
+
 
 # Load data
 try:
