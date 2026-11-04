@@ -4,6 +4,8 @@ import pandas as pd
 import psycopg2
 from dotenv import load_dotenv
 
+from validation import evaluate_baselines
+
 # 1. SETUP
 load_dotenv()
 st.set_page_config(page_title="Eco Bilge Research OS", layout="wide")
@@ -144,6 +146,23 @@ content = {
 st.sidebar.title("Eco Bilge v2.0")
 lang = st.sidebar.radio("Language / Idioma", ["Portuguese", "English"])
 c = content[lang]
+
+# 3.1 PAUL CHECK BASELINE VALIDATION (Top of Dashboard)
+validation_results = evaluate_baselines(df)
+matched_x = validation_results["matched_count"]
+
+if lang == "Portuguese":
+    v_label = "Validação de Linha de Base (Alvo: 4)"
+    v_delta = "Concorrentes conhecidos encontrados"
+else:
+    v_label = "Baseline Validation (Target: 4)"
+    v_delta = "Known competitors found"
+
+st.metric(
+    label=v_label,
+    value=f"{matched_x}/4",
+    delta=v_delta
+)
 
 # 4. TABS
 tabs = st.tabs(c["tabs"])
