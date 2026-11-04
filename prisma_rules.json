@@ -1,0 +1,4 @@
+{
+  "include_rules": "vessels under 400 GT, recreational boats, marinas, inland waterways, coastal pollution from small craft.",
+  "exclude_rules": "Industrial shipping, oil rigs, tankers, cargo ships over 400 GT, deep-sea oceanic pollution unrelated to coastal harbours."
+}
