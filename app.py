@@ -1,7 +1,6 @@
+import os
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import os
 import psycopg2
 from dotenv import load_dotenv
 
@@ -9,37 +8,60 @@ from dotenv import load_dotenv
 load_dotenv()
 st.set_page_config(page_title="Eco Bilge Research OS", layout="wide")
 
+CSV_FALLBACK_PATH = "data/eco_bilge_phase1_16col.csv"
+
 # Connect to Neon
 @st.cache_resource
 def get_neon_connection():
-    # Return the connection object
-    return psycopg2.connect(os.getenv("NEON_CONNECTION_STRING"))
+    neon_url = os.getenv("NEON_CONNECTION_STRING")
+    if not neon_url:
+        return None
+    try:
+        return psycopg2.connect(neon_url)
+    except Exception as e:
+        st.sidebar.warning(f"Database connection offline, using CSV fallback: {e}")
+        return None
 
 def fetch_data():
     conn = get_neon_connection()
-    
-    # 1. Check if connection is closed
-    if conn.closed != 0:
-        st.cache_resource.clear()  # Clear the bad connection
-        conn = get_neon_connection() # Reconnect
-        
-    # 2. Check if the transaction is aborted (e.g. after a bad query)
-    try:
-        query = "SELECT * FROM public.screening_phase_1 ORDER BY created_at DESC"
-        return pd.read_sql_query(query, conn)
-    except psycopg2.InterfaceError:
-        # If it failed, clear cache and try one more time
-        st.cache_resource.clear()
-        conn = get_neon_connection()
-        return pd.read_sql_query(query, conn)
+    if conn is not None:
+        try:
+            if conn.closed != 0:
+                st.cache_resource.clear()
+                conn = get_neon_connection()
+            query = "SELECT * FROM public.eco_bilge_phase1_16col ORDER BY id ASC"
+            remote_df = pd.read_sql_query(query, conn)
+            # Rename postgres snake_case to Fina's exact 16 columns if needed
+            col_map = {
+                "id": "ID", "category": "Category", "item": "Item",
+                "company_or_publisher": "Company or publisher", "figure": "Figure",
+                "unit": "Unit", "technology": "Technology", "target_vessels": "Target vessels",
+                "price": "Price", "country": "Country", "year": "Year",
+                "source_type": "Source type", "link": "Link", "found_by": "Found by",
+                "what_it_means_for_ecobilge": "What it means for EcoBilge", "gap": "Gap?"
+            }
+            remote_df = remote_df.rename(columns=col_map)
+            return remote_df
+        except Exception:
+            # Table might not exist yet on Neon; fallback to CSV
+            pass
 
+    # CSV Fallback for local coaching & offline mode
+    if os.path.exists(CSV_FALLBACK_PATH):
+        return pd.read_csv(CSV_FALLBACK_PATH)
 
+    # Legacy fallback if 16-col hasn't been generated
+    legacy_path = "data/eco_bilge_screening_snapshot_2026_03_03.csv"
+    if os.path.exists(legacy_path):
+        return pd.read_csv(legacy_path)
 
-# Load data
+    raise FileNotFoundError("Neither Neon DB nor local CSV data file could be found.")
+
+# Load data safely
 try:
     df = fetch_data()
 except Exception as e:
-    st.error(f"Database connection failed: {e}")
+    st.error(f"Data loading failed: {e}")
     st.stop()
 
 # 2. BILINGUAL CONTENT DICTIONARY
@@ -69,13 +91,15 @@ content = {
         "t4_q4": "Q4 (Substance): Oil/Detergent (2) vs Metals/Plastics (0)",
         "t4_q5": "Q5 (Method): Empirical study (2) vs News/Editorial (0)",
         "t4_kill": "THE KILL SWITCH: If Q3 = 0, the paper is EXCLUDED.",
-        "t5_h": "The Vault: Real-Time Results",
-        "stat_total": "Total Screened",
-        "stat_pass": "PASS (Gold)",
-        "stat_doubt": "DOUBT (Review)",
-        "stat_exclude": "EXCLUDED (Noise)",
-        "perc_h": "Decision Distribution (%)",
-        "table_h": "Passing Articles",
+        "t5_h": "The Vault: Real-Time Results & Baseline Inventory",
+        "stat_total": "Total Records",
+        "stat_manual": "Manual Baseline",
+        "stat_script": "Automated (Script)",
+        "stat_gaps": "Identified Research Gaps",
+        "table_h": "Integrated Research Inventory (16-Column Layout)",
+        "table_sub": "💡 Manual baseline rows seeded by Fina are highlighted in amber. New automated script records populate around them.",
+        "filter_cat": "Filter by Category:",
+        "filter_found": "Filter by Origin (Found by):",
         "t6_h": "Behind the Scenes: Data Structure"
     },
     "Portuguese": {
@@ -103,19 +127,21 @@ content = {
         "t4_q4": "Q4 (Substância): Óleo/Detergente (2) vs Metais/Plásticos (0)",
         "t4_q5": "Q5 (Método): Estudo empírico (2) vs Notícias/Editorial (0)",
         "t4_kill": "KILL SWITCH: Se Q3 = 0, artigo EXCLUÍDO.",
-        "t5_h": "O Cofre: Resultados em Tempo Real",
-        "stat_total": "Total Analisado",
-        "stat_pass": "PASS (Ouro)",
-        "stat_doubt": "DÚVIDA (Revisão)",
-        "stat_exclude": "EXCLUÍDOS (Ruído)",
-        "perc_h": "Distribuição de Decisões (%)",
-        "table_h": "Artigos Aprovados",
+        "t5_h": "O Cofre: Resultados em Tempo Real & Linha de Base",
+        "stat_total": "Total de Registros",
+        "stat_manual": "Linha de Base Manual",
+        "stat_script": "Automatizados (Script)",
+        "stat_gaps": "Lacunas Identificadas (Gaps)",
+        "table_h": "Inventário Integrado de Pesquisa (Layout 16 Colunas)",
+        "table_sub": "💡 As linhas manuais de referência inseridas por Fina estão destacadas em âmbar. Novos registros automatizados aparecem ao redor.",
+        "filter_cat": "Filtrar por Categoria:",
+        "filter_found": "Filtrar por Origem (Found by):",
         "t6_h": "Bastidores: Estrutura de Dados"
     }
 }
 
 # 3. SIDEBAR
-st.sidebar.title("Eco Bilge v1.0")
+st.sidebar.title("Eco Bilge v2.0")
 lang = st.sidebar.radio("Language / Idioma", ["Portuguese", "English"])
 c = content[lang]
 
@@ -147,19 +173,63 @@ with tabs[3]:
     for q in ['t4_q1', 't4_q2', 't4_q3', 't4_q4', 't4_q5']: st.write(f"- {c[q]}")
 
 with tabs[4]:
-    pass_df = df[df['decision'] == 'PASS']
     st.header(c["t5_h"])
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric(c["stat_total"], len(df))
-    m2.metric(c["stat_pass"], len(pass_df))
-    m3.metric(c["stat_doubt"], len(df[df['decision'] == 'DOUBT']))
-    m4.metric(c["stat_exclude"], len(df[df['decision'] == 'EXCLUDE']))
     
-    st.header(c["table_h"])
-    display_df = pass_df.sort_values(by='total_score', ascending=False).copy()
-    display_df['doi_link'] = display_df['doi'].apply(lambda x: f"https://doi.org/{x}" if x and str(x).startswith("10.") else "N/A")
-    st.dataframe(display_df[['total_score', 'title', 'doi_link']], use_container_width=True, column_config={"doi_link": st.column_config.LinkColumn("DOI")})
+    # 16-Column Layout Presentation with Highlighting
+    has_16_cols = "Found by" in df.columns
+
+    if has_16_cols:
+        manual_count = len(df[df["Found by"] == "Manual"])
+        script_count = len(df[df["Found by"] == "Script"])
+        gaps_count = len(df[df["Gap?"] == "Yes"])
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric(c["stat_total"], len(df))
+        m2.metric(c["stat_manual"], manual_count)
+        m3.metric(c["stat_script"], script_count)
+        m4.metric(c["stat_gaps"], gaps_count)
+
+        st.subheader(c["table_h"])
+        st.caption(c["table_sub"])
+
+        # Interactive Filtering
+        col_f1, col_f2 = st.columns(2)
+        categories = ["All"] + sorted([x for x in df["Category"].dropna().unique()])
+        selected_cat = col_f1.selectbox(c["filter_cat"], categories)
+
+        origins = ["All"] + sorted([x for x in df["Found by"].dropna().unique()])
+        selected_origin = col_f2.selectbox(c["filter_found"], origins)
+
+        filtered_df = df.copy()
+        if selected_cat != "All":
+            filtered_df = filtered_df[filtered_df["Category"] == selected_cat]
+        if selected_origin != "All":
+            filtered_df = filtered_df[filtered_df["Found by"] == selected_origin]
+
+        # Highlight manual rows with amber tint
+        def highlight_manual_rows(row):
+            if row.get("Found by") == "Manual":
+                return ["background-color: rgba(255, 193, 7, 0.25); font-weight: bold"] * len(row)
+            return [""] * len(row)
+
+        styled_df = filtered_df.style.apply(highlight_manual_rows, axis=1)
+
+        column_config = {}
+        if "Link" in filtered_df.columns:
+            column_config["Link"] = st.column_config.LinkColumn("Link / DOI")
+
+        st.dataframe(styled_df, use_container_width=True, column_config=column_config)
+    else:
+        # Fallback view for legacy schema
+        pass_df = df[df['decision'] == 'PASS'] if 'decision' in df.columns else df
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total Screened", len(df))
+        m2.metric("PASS", len(pass_df))
+        m3.metric("DOUBT", len(df[df['decision'] == 'DOUBT']) if 'decision' in df.columns else 0)
+        st.dataframe(df, use_container_width=True)
 
 with tabs[5]:
     st.header(c["t6_h"])
+    st.write("Current Schema Details:")
+    st.write(f"Columns ({len(df.columns)}): `{list(df.columns)}`")
     st.dataframe(df.head(10), use_container_width=True)
